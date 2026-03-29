@@ -1,0 +1,45 @@
+===== BASELINE METRICS =====
+CrossEntropyLoss: 0.390833
+Accuracy: 85.69%
+
+Per-class metrics:
+T-shirt/top: precision=0.7743, recall=0.8130, f1=0.7932, support=1000, class_accuracy=0.8130
+Trouser: precision=0.9828, recall=0.9700, f1=0.9763, support=1000, class_accuracy=0.9700
+Pullover: precision=0.7848, recall=0.7770, f1=0.7809, support=1000, class_accuracy=0.7770
+Dress: precision=0.8058, recall=0.9130, f1=0.8561, support=1000, class_accuracy=0.9130
+Coat: precision=0.7662, recall=0.7930, f1=0.7794, support=1000, class_accuracy=0.7930
+Sandal: precision=0.9231, recall=0.9730, f1=0.9474, support=1000, class_accuracy=0.9730
+Shirt: precision=0.6445, recall=0.5130, f1=0.5713, support=1000, class_accuracy=0.5130
+Sneaker: precision=0.9467, recall=0.9060, f1=0.9259, support=1000, class_accuracy=0.9060
+Bag: precision=0.9590, recall=0.9600, f1=0.9595, support=1000, class_accuracy=0.9600
+Ankle boot: precision=0.9539, recall=0.9510, f1=0.9524, support=1000, class_accuracy=0.9510
+
+Confusion Matrix:
+[[813   2  22  68   2   1  82   0  10   0]
+ [  2 970   1  21   3   0   2   0   1   0]
+ [ 15   2 777  18 108   0  78   0   2   0]
+ [ 21   7  11 913  26   0  21   0   1   0]
+ [  0   2  62  53 793   0  87   0   3   0]
+ [  0   0   0   2   0 973   0  15   5   5]
+ [198   3 114  54 100   0 513   0  18   0]
+ [  0   0   0   0   0  53   0 906   0  41]
+ [  1   1   3   4   3  12  13   3 960   0]
+ [  0   0   0   0   0  15   0  33   1 951]]
+
+Classification Report:
+              precision    recall  f1-score   support
+
+ T-shirt/top     0.7743    0.8130    0.7932      1000
+     Trouser     0.9828    0.9700    0.9763      1000
+    Pullover     0.7848    0.7770    0.7809      1000
+       Dress     0.8058    0.9130    0.8561      1000
+        Coat     0.7662    0.7930    0.7794      1000
+      Sandal     0.9231    0.9730    0.9474      1000
+       Shirt     0.6445    0.5130    0.5713      1000
+     Sneaker     0.9467    0.9060    0.9259      1000
+         Bag     0.9590    0.9600    0.9595      1000
+  Ankle boot     0.9539    0.9510    0.9524      1000
+
+    accuracy                         0.8569     10000
+   macro avg     0.8541    0.8569    0.8542     10000
+weighted avg     0.8541    0.8569    0.8542     10000
