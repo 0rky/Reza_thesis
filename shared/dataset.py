@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 BATCH_SIZE = 64
 
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_DATA_ROOT = os.path.join(PROJECT_ROOT, "data", "sampleNetwork")
 
 
