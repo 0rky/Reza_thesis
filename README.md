@@ -1,4 +1,4 @@
-# Thesis Experiments
+# Model Compression Experiments
 
 This repository contains baseline and model compression experiments for thesis preparation using FashionMNIST and a shared CNN architecture.
 
@@ -61,7 +61,7 @@ The `qat` experiment uses its own model definition because quantization-aware tr
 
 Repository structure:
 
-thesis-experiments/  
+model-compression-experiments/  
 ├── shared/  
 │   ├── dataset.py  
 │   └── model.py  
