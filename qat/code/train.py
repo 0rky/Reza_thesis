@@ -11,6 +11,7 @@ from sklearn.metrics import confusion_matrix, classification_report, precision_r
 import torch.ao.quantization as tq
 
 import sys
+import subprocess
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
@@ -18,13 +19,26 @@ if ROOT_DIR not in sys.path:
 
 from shared.dataset import get_dataloaders
 from model import NetQAT
+from shared.profiler import (
+    profile_model_layers,
+    EpochProfiler,
+    get_basic_system_info,
+    get_file_size_bytes,
+    get_optimizer_state_size_bytes,
+    write_json,
+)
 
 
-EPOCHS = 5
+EPOCHS = int(os.getenv("EPOCHS", "5"))
 SEED = 42
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "outputs")
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "checkpoints")
+SYSTEM_INFO_PATH = os.path.join(OUTPUT_DIR, "qat_system_info.json")
+EPOCH_PROFILE_PATH = os.path.join(OUTPUT_DIR, "qat_epoch_profile.csv")
+RUNTIME_SUMMARY_PATH = os.path.join(OUTPUT_DIR, "qat_runtime_summary.txt")
+LAYER_PROFILE_PRECONVERT_PATH = os.path.join(OUTPUT_DIR, "qat_preconvert_layer_profile.csv")
+LAYER_PROFILE_CONVERTED_PATH = os.path.join(OUTPUT_DIR, "qat_converted_layer_profile.csv")
 
 
 print("Hostname:", platform.node())
@@ -69,6 +83,9 @@ loss_fn = nn.CrossEntropyLoss()
 train_losses = []
 test_losses = []
 test_accuracies = []
+
+profiler = EpochProfiler()
+write_json(SYSTEM_INFO_PATH, get_basic_system_info())
 epoch_times = []
 
 
@@ -98,11 +115,19 @@ def train(model, device, train_loader, optimizer, epoch):
 
     print("Train Epoch: {} Loss: {:.6f} Time: {:.2f}s".format(epoch, avg_train_loss, elapsed))
 
+    profiler.record_epoch(
+        epoch,
+        "train",
+        elapsed,
+        extra={"train_loss": avg_train_loss}
+    )
 
-def test(model, device, test_loader, test_dataset):
+
+def test(model, device, test_loader, test_dataset, epoch):
     model.eval()
     test_loss = 0.0
     correct = 0
+    start_time = time.time()
 
     with torch.no_grad():
         for img, classes in test_loader:
@@ -116,17 +141,26 @@ def test(model, device, test_loader, test_dataset):
 
     test_loss /= len(test_dataset)
     accuracy = 100.0 * correct / len(test_dataset)
+    elapsed = time.time() - start_time
 
     test_losses.append(test_loss)
     test_accuracies.append(accuracy)
 
-    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n".format(
+    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%), Eval Time: {:.2f}s\n".format(
         test_loss,
         correct,
         len(test_dataset),
-        accuracy
+        accuracy,
+        elapsed
     ))
     print("=" * 30)
+
+    profiler.record_epoch(
+        epoch,
+        "test",
+        elapsed,
+        extra={"test_loss": test_loss, "test_accuracy": accuracy}
+    )
 
 
 def evaluate_with_metrics(model, device, test_loader, class_names, prefix):
@@ -237,16 +271,30 @@ def get_file_size_mb(path):
     return os.path.getsize(path) / (1024 * 1024)
 
 
+def refresh_all_experiments_report():
+    try:
+        subprocess.run(
+            ["python3", os.path.join(ROOT_DIR, "shared", "make_all_experiments_report.py")],
+            check=True
+        )
+        print("Updated: comparison_all_experiments report")
+    except Exception as e:
+        print(f"Warning: could not update all-experiments report: {e}")
+
 if __name__ == "__main__":
     for epoch in range(1, EPOCHS + 1):
         train(qat_model, device, train_loader, optimizer, epoch)
-        test(qat_model, device, test_loader, test_dataset)
+        test(qat_model, device, test_loader, test_dataset, epoch)
 
     qat_float_state_path = os.path.join(CHECKPOINT_DIR, "qat_preconvert_state_dict.pth")
     torch.save(qat_model.state_dict(), qat_float_state_path)
     print(f"Saved: {qat_float_state_path}")
 
     evaluate_with_metrics(qat_model, device, test_loader, class_names, prefix="qat_preconvert")
+    sample_batch, _ = next(iter(test_loader))
+    sample_batch = sample_batch.to(device)
+    profile_model_layers(qat_model, device, sample_batch, LAYER_PROFILE_PRECONVERT_PATH)
+    print(f"Saved layer-wise profile to: {LAYER_PROFILE_PRECONVERT_PATH}")
 
     print("\nConverting QAT model to quantized model...")
     converted_model = copy.deepcopy(qat_model).to("cpu").eval()
@@ -274,3 +322,27 @@ if __name__ == "__main__":
     print("\nSkipping ONNX export for QAT pre-convert model because fake-quant operators are not supported by this ONNX export path.")
 
     evaluate_with_metrics(converted_model, torch.device("cpu"), test_loader, class_names, prefix="qat_converted")
+    sample_batch_cpu, _ = next(iter(test_loader))
+    profile_model_layers(converted_model, torch.device("cpu"), sample_batch_cpu, LAYER_PROFILE_CONVERTED_PATH)
+    print(f"Saved layer-wise profile to: {LAYER_PROFILE_CONVERTED_PATH}")
+    profiler.save_csv(EPOCH_PROFILE_PATH)
+
+    total_params = sum(p.numel() for p in qat_model.parameters())
+    trainable_params = sum(p.numel() for p in qat_model.parameters() if p.requires_grad)
+    optimizer_state_size_bytes = get_optimizer_state_size_bytes(optimizer)
+    preconvert_state_size_bytes = get_file_size_bytes(qat_float_state_path)
+    converted_state_size_bytes = get_file_size_bytes(qat_quant_state_path)
+
+    with open(RUNTIME_SUMMARY_PATH, "w") as f:
+        f.write("===== QAT RUNTIME / SYSTEM SUMMARY =====\n")
+        f.write(f"Total parameters: {total_params}\n")
+        f.write(f"Trainable parameters: {trainable_params}\n")
+        f.write(f"Optimizer state size (bytes): {optimizer_state_size_bytes}\n")
+        if preconvert_state_size_bytes is not None:
+            f.write(f"Pre-convert state dict size (bytes): {preconvert_state_size_bytes}\n")
+            f.write(f"Pre-convert state dict size (MB): {preconvert_state_size_bytes / (1024 * 1024):.6f}\n")
+        if converted_state_size_bytes is not None:
+            f.write(f"Converted state dict size (bytes): {converted_state_size_bytes}\n")
+            f.write(f"Converted state dict size (MB): {converted_state_size_bytes / (1024 * 1024):.6f}\n")
+
+    refresh_all_experiments_report()

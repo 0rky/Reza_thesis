@@ -1,0 +1,8 @@
+===== BASELINE RUNTIME / SYSTEM SUMMARY =====
+Total parameters: 4376772
+Trainable parameters: 4376772
+Optimizer state size (bytes): 35014304
+State dict size (bytes): 17518014
+ONNX size (bytes): 17512005
+State dict size (MB): 16.706480
+ONNX size (MB): 16.700749

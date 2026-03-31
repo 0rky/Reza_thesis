@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report, precision_recall_fscore_support
 import torch.nn.utils.prune as prune
 
+import time
 import sys
+import subprocess
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
@@ -19,14 +21,28 @@ if ROOT_DIR not in sys.path:
 
 from shared.dataset import get_dataloaders
 from shared.model import Net
+from shared.profiler import (
+    profile_model_layers,
+    EpochProfiler,
+    get_basic_system_info,
+    get_file_size_bytes,
+    get_optimizer_state_size_bytes,
+    write_json,
+)
 
 
-EPOCHS = 5
+EPOCHS = int(os.getenv("EPOCHS", "5"))
 SEED = 42
-STRUCTURED_PRUNING_AMOUNT = 0.30
+STRUCTURED_PRUNING_AMOUNT = 0.10
+FINE_TUNE_EPOCHS = int(os.getenv("FINE_TUNE_EPOCHS", "2"))
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "outputs")
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "checkpoints")
+SYSTEM_INFO_PATH = os.path.join(OUTPUT_DIR, "structured_pruning_system_info.json")
+EPOCH_PROFILE_PATH = os.path.join(OUTPUT_DIR, "structured_pruning_epoch_profile.csv")
+RUNTIME_SUMMARY_PATH = os.path.join(OUTPUT_DIR, "structured_pruning_runtime_summary.txt")
+LAYER_PROFILE_DENSE_PATH = os.path.join(OUTPUT_DIR, "structured_dense_layer_profile.csv")
+LAYER_PROFILE_PRUNED_PATH = os.path.join(OUTPUT_DIR, "structured_pruned_layer_profile.csv")
 
 
 print("Hostname:", platform.node())
@@ -66,11 +82,15 @@ train_losses = []
 test_losses = []
 test_accuracies = []
 
+profiler = EpochProfiler()
+write_json(SYSTEM_INFO_PATH, get_basic_system_info())
+
 
 def train(model, device, train_loader, optimizer, epoch):
     print("inside train")
     model.train()
     running_loss = 0.0
+    start_time = time.time()
 
     for _, (img, classes) in enumerate(train_loader):
         classes = classes.type(torch.LongTensor)
@@ -87,14 +107,23 @@ def train(model, device, train_loader, optimizer, epoch):
 
     avg_train_loss = running_loss / len(train_loader)
     train_losses.append(avg_train_loss)
+    elapsed = time.time() - start_time
 
-    print("Train Epoch: {} Loss: {:.6f}".format(epoch, avg_train_loss))
+    print("Train Epoch: {} Loss: {:.6f} Time: {:.2f}s".format(epoch, avg_train_loss, elapsed))
+
+    profiler.record_epoch(
+        epoch,
+        "train",
+        elapsed,
+        extra={"train_loss": avg_train_loss}
+    )
 
 
-def test(model, device, test_loader, test_dataset):
+def test(model, device, test_loader, test_dataset, epoch):
     model.eval()
     test_loss = 0.0
     correct = 0
+    start_time = time.time()
 
     with torch.no_grad():
         for img, classes in test_loader:
@@ -108,17 +137,26 @@ def test(model, device, test_loader, test_dataset):
 
     test_loss /= len(test_dataset)
     accuracy = 100.0 * correct / len(test_dataset)
+    elapsed = time.time() - start_time
 
     test_losses.append(test_loss)
     test_accuracies.append(accuracy)
 
-    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n".format(
+    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%), Eval Time: {:.2f}s\n".format(
         test_loss,
         correct,
         len(test_dataset),
-        accuracy
+        accuracy,
+        elapsed
     ))
     print("=" * 30)
+
+    profiler.record_epoch(
+        epoch,
+        "test",
+        elapsed,
+        extra={"test_loss": test_loss, "test_accuracy": accuracy}
+    )
 
 
 def evaluate_with_metrics(model, device, test_loader, class_names, prefix):
@@ -262,10 +300,29 @@ def compute_structured_channel_sparsity(model):
     return zero_structured_units, total_structured_units, structured_sparsity
 
 
+
+
+def enforce_zero_masks(model, zero_mask_map):
+    with torch.no_grad():
+        for name, module in model.named_modules():
+            if name in zero_mask_map and isinstance(module, (nn.Conv2d, nn.Linear)):
+                module.weight.mul_(zero_mask_map[name].to(module.weight.device))
+
+
+def refresh_all_experiments_report():
+    try:
+        subprocess.run(
+            ["python3", os.path.join(ROOT_DIR, "shared", "make_all_experiments_report.py")],
+            check=True
+        )
+        print("Updated: comparison_all_experiments report")
+    except Exception as e:
+        print(f"Warning: could not update all-experiments report: {e}")
+
 if __name__ == "__main__":
     for epoch in range(1, EPOCHS + 1):
         train(model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader, test_dataset)
+        test(model, device, test_loader, test_dataset, epoch)
 
     dense_state_path = os.path.join(CHECKPOINT_DIR, "structured_dense_state_dict.pth")
     torch.save(model.state_dict(), dense_state_path)
@@ -299,12 +356,27 @@ if __name__ == "__main__":
     print("ONNX Runtime inference: OK")
 
     evaluate_with_metrics(model, device, test_loader, class_names, prefix="structured_dense")
+    sample_batch, _ = next(iter(test_loader))
+    sample_batch = sample_batch.to(device)
+    profile_model_layers(model, device, sample_batch, LAYER_PROFILE_DENSE_PATH)
+    print(f"Saved layer-wise profile to: {LAYER_PROFILE_DENSE_PATH}")
 
     print("\nApplying structured pruning...")
     prunable_modules = []
-    for module in model.modules():
-        if isinstance(module, (nn.Conv2d, nn.Linear)):
+    prunable_layer_names = {
+        "conv1", "conv2", "conv3",
+        "conv4", "conv5a", "conv5b",
+        "conv6", "conv7", "conv8",
+        "fc1", "fc2", "fc3"
+    }
+
+    for name, module in model.named_modules():
+        if name in prunable_layer_names and isinstance(module, (nn.Conv2d, nn.Linear)):
             prunable_modules.append(module)
+
+    print("Structured pruning will be applied only to these layers:")
+    for module_name in prunable_layer_names:
+        print(" -", module_name)
 
     for module in prunable_modules:
         prune.ln_structured(
@@ -323,6 +395,21 @@ if __name__ == "__main__":
 
     for module in prunable_modules:
         prune.remove(module, "weight")
+
+    zero_mask_map = {}
+    for name, module in model.named_modules():
+        if name in prunable_layer_names and isinstance(module, (nn.Conv2d, nn.Linear)):
+            zero_mask_map[name] = (module.weight.detach().cpu() != 0).to(module.weight.dtype)
+
+    print("\nStarting short fine-tuning after structured pruning...")
+    fine_tune_optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+    for fine_tune_epoch in range(1, FINE_TUNE_EPOCHS + 1):
+        print(f"Fine-tuning epoch {fine_tune_epoch}/{FINE_TUNE_EPOCHS}")
+        effective_epoch = EPOCHS + fine_tune_epoch
+        train(model, device, train_loader, fine_tune_optimizer, effective_epoch)
+        enforce_zero_masks(model, zero_mask_map)
+        test(model, device, test_loader, test_dataset, effective_epoch)
 
     zeros_after_remove, total_after_remove, zero_sparsity_after_remove = compute_zero_weight_sparsity(model)
     zero_units_after_remove, total_units_after_remove, structured_sparsity_after_remove = compute_structured_channel_sparsity(model)
@@ -358,3 +445,33 @@ if __name__ == "__main__":
         f.write(f"Total structured units: {total_units_after_remove}\n")
 
     evaluate_with_metrics(model, device, test_loader, class_names, prefix="structured_pruned")
+    sample_batch, _ = next(iter(test_loader))
+    sample_batch = sample_batch.to(device)
+    profile_model_layers(model, device, sample_batch, LAYER_PROFILE_PRUNED_PATH)
+    print(f"Saved layer-wise profile to: {LAYER_PROFILE_PRUNED_PATH}")
+    profiler.save_csv(EPOCH_PROFILE_PATH)
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    optimizer_state_size_bytes = get_optimizer_state_size_bytes(fine_tune_optimizer)
+    dense_state_size_bytes = get_file_size_bytes(dense_state_path)
+    dense_onnx_size_bytes = get_file_size_bytes(onnx_path)
+    structured_state_size_bytes = get_file_size_bytes(structured_state_path)
+
+    with open(RUNTIME_SUMMARY_PATH, "w") as f:
+        f.write("===== STRUCTURED_PRUNING RUNTIME / SYSTEM SUMMARY =====\n")
+        f.write(f"Total parameters: {total_params}\n")
+        f.write(f"Trainable parameters: {trainable_params}\n")
+        f.write(f"Optimizer state size (bytes): {optimizer_state_size_bytes}\n")
+        if dense_state_size_bytes is not None:
+            f.write(f"Dense state dict size (bytes): {dense_state_size_bytes}\n")
+            f.write(f"Dense state dict size (MB): {dense_state_size_bytes / (1024 * 1024):.6f}\n")
+        if dense_onnx_size_bytes is not None:
+            f.write(f"Dense ONNX size (bytes): {dense_onnx_size_bytes}\n")
+            f.write(f"Dense ONNX size (MB): {dense_onnx_size_bytes / (1024 * 1024):.6f}\n")
+        if structured_state_size_bytes is not None:
+            f.write(f"Structured pruned state dict size (bytes): {structured_state_size_bytes}\n")
+            f.write(f"Structured pruned state dict size (MB): {structured_state_size_bytes / (1024 * 1024):.6f}\n")
+        f.write(f"Fine-tune epochs: {FINE_TUNE_EPOCHS}\n")
+
+    refresh_all_experiments_report()

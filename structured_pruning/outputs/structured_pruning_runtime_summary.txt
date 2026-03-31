@@ -1,0 +1,11 @@
+===== STRUCTURED_PRUNING RUNTIME / SYSTEM SUMMARY =====
+Total parameters: 4376772
+Trainable parameters: 4376772
+Optimizer state size (bytes): 35014304
+Dense state dict size (bytes): 17518086
+Dense state dict size (MB): 16.706549
+Dense ONNX size (bytes): 17512005
+Dense ONNX size (MB): 16.700749
+Structured pruned state dict size (bytes): 17518122
+Structured pruned state dict size (MB): 16.706583
+Fine-tune epochs: 1

@@ -1,45 +1,45 @@
 ===== STRUCTURED_PRUNED METRICS =====
-CrossEntropyLoss: 2.179118
-Accuracy: 25.25%
+CrossEntropyLoss: 0.469805
+Accuracy: 82.30%
 
 Per-class metrics:
-T-shirt/top: precision=0.0000, recall=0.0000, f1=0.0000, support=1000, class_accuracy=0.0000
-Trouser: precision=1.0000, recall=0.2920, f1=0.4520, support=1000, class_accuracy=0.2920
-Pullover: precision=0.0952, recall=0.0200, f1=0.0331, support=1000, class_accuracy=0.0200
-Dress: precision=0.4910, recall=0.7890, f1=0.6053, support=1000, class_accuracy=0.7890
-Coat: precision=0.0000, recall=0.0000, f1=0.0000, support=1000, class_accuracy=0.0000
-Sandal: precision=0.4123, recall=0.2750, f1=0.3299, support=1000, class_accuracy=0.2750
-Shirt: precision=0.1329, recall=0.7890, f1=0.2274, support=1000, class_accuracy=0.7890
-Sneaker: precision=0.0000, recall=0.0000, f1=0.0000, support=1000, class_accuracy=0.0000
-Bag: precision=0.2802, recall=0.3600, f1=0.3151, support=1000, class_accuracy=0.3600
-Ankle boot: precision=0.0000, recall=0.0000, f1=0.0000, support=1000, class_accuracy=0.0000
+T-shirt/top: precision=0.8127, recall=0.6900, f1=0.7463, support=1000, class_accuracy=0.6900
+Trouser: precision=0.9855, recall=0.9540, f1=0.9695, support=1000, class_accuracy=0.9540
+Pullover: precision=0.7270, recall=0.7270, f1=0.7270, support=1000, class_accuracy=0.7270
+Dress: precision=0.7466, recall=0.8900, f1=0.8120, support=1000, class_accuracy=0.8900
+Coat: precision=0.7205, recall=0.7090, f1=0.7147, support=1000, class_accuracy=0.7090
+Sandal: precision=0.9593, recall=0.9190, f1=0.9387, support=1000, class_accuracy=0.9190
+Shirt: precision=0.5191, recall=0.5430, f1=0.5308, support=1000, class_accuracy=0.5430
+Sneaker: precision=0.9274, recall=0.9070, f1=0.9171, support=1000, class_accuracy=0.9070
+Bag: precision=0.9576, recall=0.9260, f1=0.9415, support=1000, class_accuracy=0.9260
+Ankle boot: precision=0.9121, recall=0.9650, f1=0.9378, support=1000, class_accuracy=0.9650
 
 Confusion Matrix:
-[[  0   0   1 427   0   0 572   0   0   0]
- [  0 292   0 127   0   0 575   0   6   0]
- [  0   0  20  11   0   0 969   0   0   0]
- [  0   0   0 789   0   0 211   0   0   0]
- [  0   0  55  36   0   0 883   0  26   0]
- [  0   0   4   5   0 275 629   0  87   0]
- [  0   0  18 188   0   0 789   0   5   0]
- [  0   0  29   0   0  48 157   0 766   0]
- [  0   0  81  23   0   1 535   0 360   0]
- [  0   0   2   1   0 343 619   0  35   0]]
+[[690   0  28 107   6   2 159   0   8   0]
+ [  0 954   5  35   4   0   0   0   2   0]
+ [  8   1 727  15 143   0 104   0   2   0]
+ [ 17   5  17 890  30   0  39   0   2   0]
+ [  0   3  81  47 709   0 157   0   3   0]
+ [  0   1   0   4   0 919   0  38   8  30]
+ [134   1 130  89  89   0 543   0  14   0]
+ [  0   0   0   0   0  30   0 907   1  62]
+ [  0   2  12   5   3   3  44   4 926   1]
+ [  0   1   0   0   0   4   0  29   1 965]]
 
 Classification Report:
               precision    recall  f1-score   support
 
- T-shirt/top     0.0000    0.0000    0.0000      1000
-     Trouser     1.0000    0.2920    0.4520      1000
-    Pullover     0.0952    0.0200    0.0331      1000
-       Dress     0.4910    0.7890    0.6053      1000
-        Coat     0.0000    0.0000    0.0000      1000
-      Sandal     0.4123    0.2750    0.3299      1000
-       Shirt     0.1329    0.7890    0.2274      1000
-     Sneaker     0.0000    0.0000    0.0000      1000
-         Bag     0.2802    0.3600    0.3151      1000
-  Ankle boot     0.0000    0.0000    0.0000      1000
+ T-shirt/top     0.8127    0.6900    0.7463      1000
+     Trouser     0.9855    0.9540    0.9695      1000
+    Pullover     0.7270    0.7270    0.7270      1000
+       Dress     0.7466    0.8900    0.8120      1000
+        Coat     0.7205    0.7090    0.7147      1000
+      Sandal     0.9593    0.9190    0.9387      1000
+       Shirt     0.5191    0.5430    0.5308      1000
+     Sneaker     0.9274    0.9070    0.9171      1000
+         Bag     0.9576    0.9260    0.9415      1000
+  Ankle boot     0.9121    0.9650    0.9378      1000
 
-    accuracy                         0.2525     10000
-   macro avg     0.2412    0.2525    0.1963     10000
-weighted avg     0.2412    0.2525    0.1963     10000
+    accuracy                         0.8230     10000
+   macro avg     0.8268    0.8230    0.8236     10000
+weighted avg     0.8268    0.8230    0.8236     10000

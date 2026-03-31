@@ -1,0 +1,17 @@
+===== COMPRESSION PLOTS SUMMARY =====
+
+Best accuracy case: mixed_precision (85.4500%)
+Smallest model case: qat_converted (4.2491 MB)
+Largest size reduction case: qat_converted (74.7465%)
+
+Per-case summary:
+- baseline: accuracy=85.07, loss=0.399263, size_mb=16.70648, size_reduction_percent=None, avg_epoch_time_seconds=None
+- mixed_precision: accuracy=85.45, loss=0.393198, size_mb=16.706514, size_reduction_percent=None, avg_epoch_time_seconds=None
+- quantization_float: accuracy=80.13, loss=0.536393, size_mb=16.706617, size_reduction_percent=None, avg_epoch_time_seconds=None
+- quantization_dynamic: accuracy=79.97, loss=0.536724, size_mb=16.637754, size_reduction_percent=0.412189, avg_epoch_time_seconds=None
+- qat_preconvert: accuracy=84.44, loss=0.437665, size_mb=16.825663, size_reduction_percent=None, avg_epoch_time_seconds=None
+- qat_converted: accuracy=84.35, loss=0.437515, size_mb=4.249075, size_reduction_percent=74.746463, avg_epoch_time_seconds=None
+- pruning_dense: accuracy=79.87, loss=0.551287, size_mb=16.706446, size_reduction_percent=None, avg_epoch_time_seconds=None
+- pruning_pruned: accuracy=79.64, loss=0.554264, size_mb=16.70648, size_reduction_percent=-0.000206, avg_epoch_time_seconds=None
+- structured_dense: accuracy=80.64, loss=0.531298, size_mb=16.706549, size_reduction_percent=None, avg_epoch_time_seconds=None
+- structured_pruned: accuracy=82.3, loss=0.469805, size_mb=16.706583, size_reduction_percent=-0.000206, avg_epoch_time_seconds=None

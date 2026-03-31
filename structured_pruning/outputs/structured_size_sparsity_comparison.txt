@@ -2,9 +2,9 @@
 Dense model size (MB): 16.706549
 Structured pruned model size (MB): 16.706583
 Size reduction (%): -0.000206
-Zero-weight sparsity after pruning (%): 30.042837
-Structured sparsity after pruning (%): 30.023548
-Zero weights after pruning: 1314141
+Zero-weight sparsity after pruning (%): 10.003923
+Structured sparsity after pruning (%): 9.890110
+Zero weights after pruning: 437594
 Total prunable weights: 4374224
-Zero structured units after pruning: 765
+Zero structured units after pruning: 252
 Total structured units: 2548

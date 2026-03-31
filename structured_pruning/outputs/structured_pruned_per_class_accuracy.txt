@@ -1,10 +1,10 @@
-T-shirt/top: 0.0000
-Trouser: 0.2920
-Pullover: 0.0200
-Dress: 0.7890
-Coat: 0.0000
-Sandal: 0.2750
-Shirt: 0.7890
-Sneaker: 0.0000
-Bag: 0.3600
-Ankle boot: 0.0000
+T-shirt/top: 0.6900
+Trouser: 0.9540
+Pullover: 0.7270
+Dress: 0.8900
+Coat: 0.7090
+Sandal: 0.9190
+Shirt: 0.5430
+Sneaker: 0.9070
+Bag: 0.9260
+Ankle boot: 0.9650

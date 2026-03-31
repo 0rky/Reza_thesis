@@ -1,6 +1,8 @@
 import os
 import platform
 import time
+import sys
+import subprocess
 import numpy as np
 import onnx
 import onnxruntime as ort
@@ -11,22 +13,32 @@ import torch.nn.functional as F
 from sklearn.metrics import confusion_matrix, classification_report, precision_recall_fscore_support
 import matplotlib.pyplot as plt
 
-import sys
-
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
 from shared.dataset import get_dataloaders
 from shared.model import Net
+from shared.profiler import (
+    EpochProfiler,
+    count_parameters,
+    get_basic_system_info,
+    get_file_size_bytes,
+    get_optimizer_state_size_bytes,
+    reset_gpu_peak_memory,
+    write_json,
+    profile_model_layers,
+)
 
-
-EPOCHS = 5
+EPOCHS = int(os.getenv("EPOCHS", "5"))
 SEED = 42
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "outputs")
 CHECKPOINT_DIR = os.path.join(PROJECT_ROOT, "checkpoints")
-
+SYSTEM_INFO_PATH = os.path.join(OUTPUT_DIR, "mixed_precision_system_info.json")
+EPOCH_PROFILE_PATH = os.path.join(OUTPUT_DIR, "mixed_precision_epoch_profile.csv")
+RUNTIME_SUMMARY_PATH = os.path.join(OUTPUT_DIR, "mixed_precision_runtime_summary.txt")
+LAYER_PROFILE_PATH = os.path.join(OUTPUT_DIR, "mixed_precision_layer_profile.csv")
 
 print("Hostname:", platform.node())
 print("User:", os.getenv("USER"))
@@ -55,14 +67,19 @@ if torch.cuda.is_available():
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
+profiler = EpochProfiler()
+write_json(SYSTEM_INFO_PATH, get_basic_system_info())
+
 train_dataset, test_dataset, train_loader, test_loader, class_names = get_dataloaders()
 
 model = Net().to(device)
+total_params, trainable_params = count_parameters(model)
 optimizer = optim.Adam(params=model.parameters(), lr=0.0001)
 loss_fn = nn.CrossEntropyLoss()
 
 amp_enabled = (device.type == "cuda")
-scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
+autocast_dtype = torch.float16
+scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
 train_losses = []
 test_losses = []
@@ -74,7 +91,8 @@ def train(model, device, train_loader, optimizer, epoch):
     print("inside train")
     model.train()
     running_loss = 0.0
-    start_time = time.time()
+    reset_gpu_peak_memory()
+    epoch_start_time = time.time()
 
     for _, (img, classes) in enumerate(train_loader):
         classes = classes.type(torch.LongTensor)
@@ -82,7 +100,7 @@ def train(model, device, train_loader, optimizer, epoch):
 
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast(enabled=amp_enabled):
+        with torch.amp.autocast("cuda", enabled=amp_enabled, dtype=autocast_dtype):
             output = model(img)
             loss = loss_fn(output, classes)
 
@@ -95,22 +113,33 @@ def train(model, device, train_loader, optimizer, epoch):
     avg_train_loss = running_loss / len(train_loader)
     train_losses.append(avg_train_loss)
 
-    elapsed = time.time() - start_time
-    epoch_times.append(elapsed)
+    elapsed_seconds = time.time() - epoch_start_time
+    epoch_times.append(elapsed_seconds)
 
-    print("Train Epoch: {} Loss: {:.6f} Time: {:.2f}s".format(epoch, avg_train_loss, elapsed))
+    profiler.record_epoch(
+        epoch,
+        "train",
+        elapsed_seconds,
+        {
+            "train_loss": avg_train_loss,
+            "amp_enabled": int(amp_enabled),
+        }
+    )
+
+    print("Train Epoch: {} Loss: {:.6f} Time: {:.2f}s".format(epoch, avg_train_loss, elapsed_seconds))
 
 
-def test(model, device, test_loader, test_dataset):
+def test(model, device, test_loader, test_dataset, epoch):
     model.eval()
     test_loss = 0.0
     correct = 0
+    eval_start_time = time.time()
 
     with torch.no_grad():
         for img, classes in test_loader:
             img, classes = img.to(device), classes.to(device)
 
-            with torch.cuda.amp.autocast(enabled=amp_enabled):
+            with torch.amp.autocast("cuda", enabled=amp_enabled, dtype=autocast_dtype):
                 y_hat = model(img)
                 batch_loss = F.cross_entropy(y_hat, classes, reduction="sum")
 
@@ -125,11 +154,24 @@ def test(model, device, test_loader, test_dataset):
     test_losses.append(test_loss)
     test_accuracies.append(accuracy)
 
-    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n".format(
+    elapsed_seconds = time.time() - eval_start_time
+    profiler.record_epoch(
+        epoch,
+        "test",
+        elapsed_seconds,
+        {
+            "test_loss": test_loss,
+            "test_accuracy": accuracy,
+            "amp_enabled": int(amp_enabled),
+        }
+    )
+
+    print("\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%), Eval Time: {:.2f}s\n".format(
         test_loss,
         correct,
         len(test_dataset),
-        accuracy
+        accuracy,
+        elapsed_seconds
     ))
     print("=" * 30)
 
@@ -145,7 +187,7 @@ def evaluate_with_metrics(model, device, test_loader, class_names):
         for img, classes in test_loader:
             img, classes = img.to(device), classes.to(device)
 
-            with torch.cuda.amp.autocast(enabled=amp_enabled):
+            with torch.amp.autocast("cuda", enabled=amp_enabled, dtype=autocast_dtype):
                 outputs = model(img)
                 loss = loss_fn(outputs, classes)
 
@@ -272,16 +314,26 @@ def evaluate_with_metrics(model, device, test_loader, class_names):
     plt.close()
 
     print(f"\nSaved metrics to: {metrics_path}")
-    print("Saved confusion matrix to mixed_precision/outputs/mixed_precision_confusion_matrix.png")
-    print("Saved loss curve to mixed_precision/outputs/mixed_precision_loss_curve.png")
-    print("Saved accuracy curve to mixed_precision/outputs/mixed_precision_accuracy_curve.png")
-    print("Saved epoch time curve to mixed_precision/outputs/mixed_precision_epoch_time_curve.png")
+    print("Saved confusion matrix to: mixed_precision/outputs/mixed_precision_confusion_matrix.png")
+    print("Saved loss curve to: mixed_precision/outputs/mixed_precision_loss_curve.png")
+    print("Saved accuracy curve to: mixed_precision/outputs/mixed_precision_accuracy_curve.png")
+    print("Saved epoch time curve to: mixed_precision/outputs/mixed_precision_epoch_time_curve.png")
 
+
+def refresh_all_experiments_report():
+    try:
+        subprocess.run(
+            ["python3", os.path.join(ROOT_DIR, "shared", "make_all_experiments_report.py")],
+            check=True
+        )
+        print("Updated: comparison_all_experiments report")
+    except Exception as e:
+        print(f"Warning: could not update all-experiments report: {e}")
 
 if __name__ == "__main__":
     for epoch in range(1, EPOCHS + 1):
         train(model, device, train_loader, optimizer, epoch)
-        test(model, device, test_loader, test_dataset)
+        test(model, device, test_loader, test_dataset, epoch)
 
     state_dict_path = os.path.join(CHECKPOINT_DIR, "mixed_precision_state_dict.pth")
     torch.save(model.state_dict(), state_dict_path)
@@ -315,3 +367,29 @@ if __name__ == "__main__":
     print("ONNX Runtime inference: OK")
 
     evaluate_with_metrics(model, device, test_loader, class_names)
+    sample_batch, _ = next(iter(test_loader))
+    sample_batch = sample_batch.to(device)
+    profile_model_layers(model, device, sample_batch, LAYER_PROFILE_PATH)
+    print(f"Saved layer-wise profile to: {LAYER_PROFILE_PATH}")
+
+
+    profiler.save_csv(EPOCH_PROFILE_PATH)
+
+    state_dict_size_bytes = get_file_size_bytes(state_dict_path)
+    onnx_size_bytes = get_file_size_bytes(onnx_path)
+    optimizer_state_size_bytes = get_optimizer_state_size_bytes(optimizer)
+
+    with open(RUNTIME_SUMMARY_PATH, "w") as f:
+        f.write("===== MIXED PRECISION RUNTIME / SYSTEM SUMMARY =====\n")
+        f.write(f"Total parameters: {total_params}\n")
+        f.write(f"Trainable parameters: {trainable_params}\n")
+        f.write(f"Optimizer state size (bytes): {optimizer_state_size_bytes}\n")
+        f.write(f"State dict size (bytes): {state_dict_size_bytes}\n")
+        f.write(f"ONNX size (bytes): {onnx_size_bytes}\n")
+        f.write(f"AMP enabled: {amp_enabled}\n")
+        f.write(f"Autocast dtype: {autocast_dtype}\n")
+        if state_dict_size_bytes is not None:
+            f.write(f"State dict size (MB): {state_dict_size_bytes / (1024 * 1024):.6f}\n")
+        if onnx_size_bytes is not None:
+            f.write(f"ONNX size (MB): {onnx_size_bytes / (1024 * 1024):.6f}\n")
+    refresh_all_experiments_report()

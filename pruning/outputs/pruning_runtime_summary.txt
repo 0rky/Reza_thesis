@@ -1,0 +1,10 @@
+===== PRUNING RUNTIME / SYSTEM SUMMARY =====
+Total parameters: 4376772
+Trainable parameters: 4376772
+Optimizer state size (bytes): 35014304
+Dense state dict size (bytes): 17517978
+Dense state dict size (MB): 16.706446
+Dense ONNX size (bytes): 17512005
+Dense ONNX size (MB): 16.700749
+Pruned state dict size (bytes): 17518014
+Pruned state dict size (MB): 16.706480
