@@ -1,8 +1,8 @@
 ===== ENRICHED PLOT SUMMARY =====
 
-Best accuracy: mixed_precision (85.4500%)
+Best accuracy: qat_preconvert (90.8000%)
 Smallest model: qat_converted (4.2491 MB)
-Fastest train epoch: mixed_precision (84.83 s)
+Fastest train epoch: quantization_float (84.26 s)
 Lowest max GPU allocated: mixed_precision (279.64 MB)
 
 Created plot files:

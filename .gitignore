@@ -2,11 +2,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
 .DS_Store
-._*
-
-logs/
 
 data/
 
@@ -14,6 +10,3 @@ data/
 *.pth
 *.onnx
 *.npy
-
-*before*
-*backup*

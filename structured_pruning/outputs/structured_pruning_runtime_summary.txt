@@ -8,4 +8,4 @@ Dense ONNX size (bytes): 17512005
 Dense ONNX size (MB): 16.700749
 Structured pruned state dict size (bytes): 17518122
 Structured pruned state dict size (MB): 16.706583
-Fine-tune epochs: 1
+Fine-tune epochs: 2
