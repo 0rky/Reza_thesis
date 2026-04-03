@@ -1,7 +1,0 @@
-===== PRUNING SIZE / SPARSITY COMPARISON =====
-Dense model size (MB): 16.706446
-Pruned model size (MB): 16.706480
-Size reduction (%): -0.000206
-Global sparsity after pruning (%): 29.999995
-Zero weights after pruning: 1312267
-Total prunable weights: 4374224

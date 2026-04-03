@@ -1,0 +1,20 @@
+===== ENRICHED PLOT SUMMARY =====
+
+Best accuracy: qat_preconvert (90.8000%)
+Smallest model: qat_converted (4.2491 MB)
+Fastest train epoch: quantization_float (84.26 s)
+Lowest max GPU allocated: mixed_precision (279.64 MB)
+
+Created plot files:
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/accuracy_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/loss_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/model_size_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/size_reduction_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/avg_train_epoch_time_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/avg_test_epoch_time_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/max_gpu_allocated_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/max_gpu_reserved_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/avg_rss_ram_comparison.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/accuracy_vs_model_size.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/accuracy_vs_train_time.png
+- /users/kashkoul/model-compression-experiments/reports/plots_enriched/accuracy_vs_gpu_memory.png

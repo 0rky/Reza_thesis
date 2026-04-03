@@ -1,8 +1,0 @@
-===== QAT RUNTIME / SYSTEM SUMMARY =====
-Total parameters: 4376772
-Trainable parameters: 4376772
-Optimizer state size (bytes): 35014304
-Pre-convert state dict size (bytes): 17642986
-Pre-convert state dict size (MB): 16.825663
-Converted state dict size (bytes): 4455478
-Converted state dict size (MB): 4.249075

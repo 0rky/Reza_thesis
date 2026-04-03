@@ -1,4 +1,0 @@
-===== QUANTIZATION SIZE COMPARISON =====
-Float model size (MB): 16.706617
-Quantized model size (MB): 16.637754
-Size reduction (%): 0.412189

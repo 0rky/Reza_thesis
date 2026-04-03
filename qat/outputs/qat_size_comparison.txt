@@ -1,4 +1,0 @@
-===== QAT SIZE COMPARISON =====
-QAT pre-convert model size (MB): 16.825663
-QAT converted model size (MB): 4.249075
-Size reduction (%): 74.746463
